@@ -1,2 +1,2 @@
 [phases.setup]
-aptPkgs = ["yt-dlp", "ffmpeg"]
+nixPkgs = ["python311", "yt-dlp", "ffmpeg"]
