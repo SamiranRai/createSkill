@@ -7,7 +7,7 @@ const path = require('path')
 
 const execAsync = promisify(exec)
 
-const YT_DLP_BIN = process.env.YT_DLP_PATH || '/opt/homebrew/bin/yt-dlp'
+const YT_DLP_BIN = process.env.YT_DLP_PATH || "yt-dlp";
 const TMP_DIR    = path.join(__dirname, '../../../../tmp')
 const TIMEOUT_MS = 30_000
 
