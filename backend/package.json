@@ -4,7 +4,8 @@
   "main": "server.js",
   "scripts": {
     "dev": "node --watch server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "postinstall": "apt-get update && apt-get install -y yt-dlp ffmpeg"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
