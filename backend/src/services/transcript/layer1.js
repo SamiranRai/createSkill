@@ -205,6 +205,6 @@ const getTranscript = async (videoId) => {
   cache.set(videoId, text);
   console.log(`[Layer1] ✓ Done — ${text.length} chars`);
   return text;
-};;
+};
 
 module.exports = getTranscript;
