@@ -21,6 +21,15 @@ if (isDev) app.use(morgan('dev'))
 
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }))
 
+app.get("/ytdlp", async (req, res) => {
+  const { exec } = require("child_process");
+
+  exec("yt-dlp --version", (err, stdout) => {
+    if (err) return res.send(err.message);
+    res.send(stdout);
+  });
+});
+
 registerGlobalRouteHandler(app)
 
 app.use((req, res, next) => {
