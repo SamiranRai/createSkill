@@ -11,12 +11,11 @@ const execAsync = promisify(exec);
 
 const YT_DLP_BIN = process.env.YT_DLP_PATH || "yt-dlp";
 const TMP_DIR = path.join(__dirname, "../../../../tmp");
-const TIMEOUT_MS = 60_000; // increased — proxy adds latency
+const TIMEOUT_MS = 45_000;
 const IS_PROD = process.env.NODE_ENV === "production";
 
 // ─── Proxy Pool ──────────────────────────────────────────────────────────────
-// Comma-separate multiple proxies in RESIDENTIAL_PROXY_URL for rotation
-// e.g. "http://user:pass@p1.webshare.io:80,http://user:pass@p2.webshare.io:80"
+
 const PROXY_POOL = (process.env.RESIDENTIAL_PROXY_URL || "")
   .split(",")
   .map((p) => p.trim())
@@ -34,10 +33,10 @@ const ensureDir = (dir) => {
 };
 
 const cleanupFile = (filePath) => {
-  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  try {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  } catch {}
 };
-
-const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
 const decodeEntities = (text) =>
   text
@@ -76,10 +75,9 @@ const parseVTT = (vtt) => {
 };
 
 // ─── Strategy Builder ────────────────────────────────────────────────────────
-// Each strategy is a different combination of client, proxy, and timing.
-// They are tried in order — first success wins.
+// Each strategy gets a unique outputPath so parallel runs don't collide
 
-const buildStrategies = (videoId, outputPath, cookiePath) => {
+const buildStrategies = (videoId, cookiePath) => {
   const base = [
     "--write-subs",
     "--write-auto-subs",
@@ -92,44 +90,32 @@ const buildStrategies = (videoId, outputPath, cookiePath) => {
   const cookieFlag = cookiePath ? `--cookies "${cookiePath}"` : "";
   const proxy = getRandomProxy();
   const proxyFlag = proxy ? `--proxy "${proxy}"` : "";
-  const output = `--output "${outputPath}"`;
-  const url = `"https://www.youtube.com/watch?v=${videoId}"`;
 
-  // Client presets
-  const iosClient = [
+  const iosArgs = [
     `--extractor-args "youtube:player_client=ios"`,
     `--user-agent "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X)"`,
   ];
-  const webStealth = [
-    `--extractor-args "youtube:player_client=web"`,
-    "--sleep-interval 2",
-    "--max-sleep-interval 5",
-  ];
 
   const strategies = [
-    // Best: iOS client spoofs mobile app — lowest bot suspicion
+    // Fired in parallel: ios+proxy vs ios+noproxy — fastest wins
     {
-      name: "ios+proxy+cookies",
-      args: [...base, ...iosClient, cookieFlag, proxyFlag, output, url],
+      name: "ios+proxy",
+      outputPath: path.join(TMP_DIR, `${videoId}_p`),
+      args: [...base, ...iosArgs, cookieFlag, proxyFlag],
     },
-    // Good: web client with sleep intervals — slower but stealthier
     {
-      name: "web+sleep+proxy+cookies",
-      args: [...base, ...webStealth, cookieFlag, proxyFlag, output, url],
+      name: "ios+noproxy",
+      outputPath: path.join(TMP_DIR, `${videoId}_n`),
+      args: [...base, ...iosArgs, cookieFlag],
     },
-    // Fallback: iOS without proxy — in case proxy IP is the problem
+    // Sequential fallback if both parallel fail
     {
-      name: "ios+cookies+noproxy",
-      args: [...base, ...iosClient, cookieFlag, output, url],
-    },
-    // Last resort: bare command with just cookies
-    {
-      name: "bare+cookies",
-      args: [...base, cookieFlag, output, url],
+      name: "bare",
+      outputPath: path.join(TMP_DIR, `${videoId}_b`),
+      args: [...base, cookieFlag],
     },
   ];
 
-  // Locally: swap cookie file for browser cookies — no setup needed
   if (!IS_PROD) {
     return strategies.map((s) => ({
       ...s,
@@ -143,41 +129,31 @@ const buildStrategies = (videoId, outputPath, cookiePath) => {
   return strategies;
 };
 
-// ─── Strategy Runner ─────────────────────────────────────────────────────────
+// ─── Run one strategy ────────────────────────────────────────────────────────
 
-const tryStrategy = async (strategy, retries = 2) => {
-  const command = [YT_DLP_BIN, ...strategy.args].filter(Boolean).join(" ");
+const runStrategy = async (strategy, videoId) => {
+  const vttFile = `${strategy.outputPath}.en.vtt`;
+  cleanupFile(vttFile);
 
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      console.log(
-        `[Layer1] Strategy="${strategy.name}" attempt=${attempt}/${retries}`,
-      );
-      await execAsync(command, { timeout: TIMEOUT_MS });
-      return true;
-    } catch (err) {
-      const is429 = err.message.includes("429");
-      const isBot = err.message.includes("Sign in to confirm");
-      const isLast = attempt === retries;
+  const command = [
+    YT_DLP_BIN,
+    ...strategy.args,
+    `--output "${strategy.outputPath}"`,
+    `"https://www.youtube.com/watch?v=${videoId}"`,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
-      if (isLast) {
-        console.warn(
-          `[Layer1] Strategy "${strategy.name}" exhausted: ${err.message.slice(0, 150)}`,
-        );
-        return false;
-      }
+  console.log(`[Layer1] → ${strategy.name}`);
 
-      if (is429 || isBot) {
-        const wait = attempt * 4000; // 4s → 8s
-        console.log(
-          `[Layer1] ${is429 ? "429 rate limit" : "bot check"} — retrying in ${wait / 1000}s`,
-        );
-        await sleep(wait);
-      }
-    }
+  try {
+    await execAsync(command, { timeout: TIMEOUT_MS });
+    if (fs.existsSync(vttFile)) return vttFile;
+    return null;
+  } catch (err) {
+    console.warn(`[Layer1] ✗ ${strategy.name}: ${err.message.slice(0, 100)}`);
+    return null;
   }
-
-  return false;
 };
 
 // ─── In-Memory Cache ─────────────────────────────────────────────────────────
@@ -192,26 +168,31 @@ const getTranscript = async (videoId) => {
     return cache.get(videoId);
   }
 
-  console.log(`[Layer1] Fetching transcript — videoId: ${videoId}`);
+  console.log(`[Layer1] Fetching — ${videoId}`);
   ensureDir(TMP_DIR);
 
-  const outputPath = path.join(TMP_DIR, videoId);
-  const vttFile = `${outputPath}.en.vtt`;
-  cleanupFile(vttFile);
-
   const cookiePath = IS_PROD ? writeCookieFile() : null;
-  const strategies = buildStrategies(videoId, outputPath, cookiePath);
+  const [s1, s2, s3] = buildStrategies(videoId, cookiePath);
 
-  for (const strategy of strategies) {
-    await tryStrategy(strategy);
-    if (fs.existsSync(vttFile)) break; // vtt file exists = success
-    await sleep(1500); // brief pause before trying next strategy
+  // Phase 1: race s1 and s2 in parallel — whichever finishes first wins
+  let vttFile = await Promise.any(
+    [runStrategy(s1, videoId), runStrategy(s2, videoId)].map((p) =>
+      p.then((r) => r ?? Promise.reject()),
+    ),
+  ).catch(() => null);
+
+  // Phase 2: sequential fallback
+  if (!vttFile) {
+    console.log("[Layer1] Parallel strategies failed, trying fallback...");
+    vttFile = await runStrategy(s3, videoId);
   }
 
-  if (!fs.existsSync(vttFile)) {
+  // Cleanup leftover files from losing strategies
+  [s1, s2, s3].forEach((s) => cleanupFile(`${s.outputPath}.en.vtt`));
+
+  if (!vttFile) {
     throw new Error(
-      "[Layer1] All strategies exhausted — YouTube may be blocking this server. " +
-        "Check proxy health, refresh cookies, or upgrade to a paid proxy plan.",
+      "[Layer1] All strategies failed — check proxy health or refresh cookies.",
     );
   }
 
@@ -219,11 +200,11 @@ const getTranscript = async (videoId) => {
   cleanupFile(vttFile);
 
   const text = parseVTT(raw);
-  if (!text) throw new Error("[Layer1] Transcript parsed but came back empty");
+  if (!text) throw new Error("[Layer1] Transcript empty after parsing");
 
   cache.set(videoId, text);
-  console.log(`[Layer1] Done — ${text.length} chars`);
+  console.log(`[Layer1] ✓ Done — ${text.length} chars`);
   return text;
-};
+};;
 
 module.exports = getTranscript;
