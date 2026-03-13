@@ -7,14 +7,10 @@ const path = require("path");
 
 const execAsync = promisify(exec);
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
 const YT_DLP_BIN = process.env.YT_DLP_PATH || "yt-dlp";
 const TMP_DIR = path.join(__dirname, "../../../../tmp");
 const TIMEOUT_MS = 45_000;
 const IS_PROD = process.env.NODE_ENV === "production";
-
-// ─── Proxy Pool ──────────────────────────────────────────────────────────────
 
 const PROXY_POOL = (process.env.RESIDENTIAL_PROXY_URL || "")
   .split(",")
@@ -25,8 +21,6 @@ const getRandomProxy = () => {
   if (!PROXY_POOL.length) return null;
   return PROXY_POOL[Math.floor(Math.random() * PROXY_POOL.length)];
 };
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const ensureDir = (dir) => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -74,9 +68,6 @@ const parseVTT = (vtt) => {
   return decodeEntities(deduped.join(" ").replace(/\s+/g, " ").trim());
 };
 
-// ─── Strategy Builder ────────────────────────────────────────────────────────
-// Each strategy gets a unique outputPath so parallel runs don't collide
-
 const buildStrategies = (videoId, cookiePath) => {
   const base = [
     "--write-subs",
@@ -97,7 +88,6 @@ const buildStrategies = (videoId, cookiePath) => {
   ];
 
   const strategies = [
-    // Fired in parallel: ios+proxy vs ios+noproxy — fastest wins
     {
       name: "ios+proxy",
       outputPath: path.join(TMP_DIR, `${videoId}_p`),
@@ -108,7 +98,6 @@ const buildStrategies = (videoId, cookiePath) => {
       outputPath: path.join(TMP_DIR, `${videoId}_n`),
       args: [...base, ...iosArgs, cookieFlag],
     },
-    // Sequential fallback if both parallel fail
     {
       name: "bare",
       outputPath: path.join(TMP_DIR, `${videoId}_b`),
@@ -128,8 +117,6 @@ const buildStrategies = (videoId, cookiePath) => {
 
   return strategies;
 };
-
-// ─── Run one strategy ────────────────────────────────────────────────────────
 
 const runStrategy = async (strategy, videoId) => {
   const vttFile = `${strategy.outputPath}.en.vtt`;
@@ -156,11 +143,7 @@ const runStrategy = async (strategy, videoId) => {
   }
 };
 
-// ─── In-Memory Cache ─────────────────────────────────────────────────────────
-
 const cache = new Map();
-
-// ─── Public API ──────────────────────────────────────────────────────────────
 
 const getTranscript = async (videoId) => {
   if (cache.has(videoId)) {
@@ -174,7 +157,7 @@ const getTranscript = async (videoId) => {
   const cookiePath = IS_PROD ? writeCookieFile() : null;
   const [s1, s2, s3] = buildStrategies(videoId, cookiePath);
 
-  // Phase 1: race s1 and s2 in parallel — whichever finishes first wins
+  // Phase 1: race s1 and s2 in parallel
   let vttFile = await Promise.any(
     [runStrategy(s1, videoId), runStrategy(s2, videoId)].map((p) =>
       p.then((r) => r ?? Promise.reject()),
@@ -187,17 +170,17 @@ const getTranscript = async (videoId) => {
     vttFile = await runStrategy(s3, videoId);
   }
 
-  // Cleanup leftover files from losing strategies
-  [s1, s2, s3].forEach((s) => cleanupFile(`${s.outputPath}.en.vtt`));
-
   if (!vttFile) {
+    // Cleanup all then throw
+    [s1, s2, s3].forEach((s) => cleanupFile(`${s.outputPath}.en.vtt`));
     throw new Error(
       "[Layer1] All strategies failed — check proxy health or refresh cookies.",
     );
   }
 
+  // ✅ READ FIRST, then cleanup losers
   const raw = fs.readFileSync(vttFile, "utf8");
-  cleanupFile(vttFile);
+  [s1, s2, s3].forEach((s) => cleanupFile(`${s.outputPath}.en.vtt`));
 
   const text = parseVTT(raw);
   if (!text) throw new Error("[Layer1] Transcript empty after parsing");
