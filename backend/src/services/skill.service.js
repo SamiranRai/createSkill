@@ -1,6 +1,7 @@
 'use strict'
 
 const { GoogleGenerativeAI } = require('@google/generative-ai')
+const { env } = require("../config/env");
 
 const MODEL = "gemini-3-flash-preview";
 const MAX_TOKENS  = 8192
@@ -279,10 +280,10 @@ After collecting all answers and receiving confirmation of your situation summar
 let _client = null
 
 const getClient = () => {
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error('[SkillService] GEMINI_API_KEY is not set')
+  if (!env.GEMINI_API_KEY) {
+    throw new Error("[SkillService] GEMINI_API_KEY is not set");
   }
-  if (!_client) _client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+  if (!_client) _client = new GoogleGenerativeAI(env.GEMINI_API_KEY);
   return _client
 }
 

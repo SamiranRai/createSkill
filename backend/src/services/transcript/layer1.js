@@ -4,15 +4,16 @@ const { exec } = require("child_process");
 const { promisify } = require("util");
 const fs = require("fs");
 const path = require("path");
+const { env, isProd } = require("../../config/env");
 
 const execAsync = promisify(exec);
 
-const YT_DLP_BIN = process.env.YT_DLP_PATH || "yt-dlp";
+const YT_DLP_BIN = env.YT_DLP_PATH || "yt-dlp";
 const TMP_DIR = path.join(__dirname, "../../../../tmp");
 const TIMEOUT_MS = 45_000;
-const IS_PROD = process.env.NODE_ENV === "production";
+const IS_PROD = isProd;
 
-const PROXY_POOL = (process.env.RESIDENTIAL_PROXY_URL || "")
+const PROXY_POOL = (env.RESIDENTIAL_PROXY_URL || "")
   .split(",")
   .map((p) => p.trim())
   .filter(Boolean);
@@ -21,6 +22,7 @@ const getRandomProxy = () => {
   if (!PROXY_POOL.length) return null;
   return PROXY_POOL[Math.floor(Math.random() * PROXY_POOL.length)];
 };
+
 
 const ensureDir = (dir) => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -41,7 +43,7 @@ const decodeEntities = (text) =>
     .replace(/&gt;/g, ">");
 
 const writeCookieFile = () => {
-  const b64 = process.env.YT_COOKIES_B64;
+  const b64 = env.YT_COOKIES_B64;
   if (!b64) return null;
   const cookiePath = path.join("/tmp", "yt-cookies.txt");
   fs.writeFileSync(cookiePath, Buffer.from(b64, "base64").toString("utf8"));

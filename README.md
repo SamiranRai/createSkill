@@ -10,14 +10,18 @@ createSkill converts any YouTube video into an agent-ready `SKILL.md` file that 
 
 ## Backend setup
 1) `cd backend`
-2) Copy env: `cp .env.example .env` and fill `MONGODB_URI`, `GEMINI_API_KEY`, optional `YT_DLP_PATH`, and `PORT`
-3) Install deps: `npm install`
-4) Run server: `npm run dev` (or `npm start`)
+2) Copy env: `cp .env.example .env` and fill required values (`MONGODB_URI`, `GEMINI_API_KEY`)
+3) Optional stage file for tests: create `.env.test` (loaded when `APP_STAGE=test`)
+4) Optional values: `YT_DLP_PATH`, `YT_COOKIES_B64`, `RESIDENTIAL_PROXY_URL`, `PORT`, `APP_STAGE`
+5) Install deps: `npm install`
+6) Run server: `npm run dev` (or `npm start`)
 
 ## Frontend setup
 1) `cd frontend`
-2) Install deps: `npm install`
-3) Run app: `npm run dev` (Vite on port 5173; proxies API to backend)
+2) Optional env: copy `cp .env.example .env` and set `VITE_API_URL` for a remote API
+3) If `VITE_API_URL` is empty, frontend uses local `/api/v1` proxy from Vite
+4) Install deps: `npm install`
+5) Run app: `npm run dev` (Vite on port 5173; proxies API to backend)
 
 ## API endpoints
 - `POST /api/v1/jobs` — body `{ youtubeUrl }`; creates a job

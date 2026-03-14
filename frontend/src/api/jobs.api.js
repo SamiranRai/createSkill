@@ -1,5 +1,6 @@
-const BASE = `${import.meta.env.VITE_API_URL}/api/v1/jobs`;
-// const BASE = "/api/v1/jobs";
+const API_ROOT = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+const BASE = `${API_ROOT}/api/v1/jobs`;
+
 export const createJob = async (youtubeUrl) => {
   const res = await fetch(BASE, {
     method: "POST",
