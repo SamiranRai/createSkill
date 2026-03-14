@@ -34,13 +34,13 @@ const UrlInput = ({ onSubmit, loading }) => {
         <input
           className="input"
           type="url"
-          placeholder="Paste any YouTube URL..."
+          placeholder="https://youtube.com/watch?v=..."
           value={value}
           onChange={(e) => setValue(e.target.value)}
           disabled={loading}
         />
         <button className="button primary" type="submit" disabled={loading}>
-          Extract Knowledge →
+          Generate Skill →
         </button>
       </div>
       {localError && <div className="inline-error">{localError}</div>}

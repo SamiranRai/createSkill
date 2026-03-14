@@ -1,8 +1,8 @@
 const steps = [
-  { key: "fetching_transcript", title: "Extracting Transcript" },
-  { key: "cleaning", title: "Cleaning Knowledge" },
-  { key: "extracting_skill", title: "Building Skill File" },
-  { key: "complete", title: "Ready" },
+  { key: "fetching_transcript", title: "Learning from the Video" },
+  { key: "cleaning", title: "Structuring the Knowledge" },
+  { key: "extracting_skill", title: "Generating Agent Skill" },
+  { key: "complete", title: "Skill Ready" },
 ];
 
 const ProgressSteps = ({ status, failureStage }) => {

@@ -13,7 +13,7 @@ const DownloadPanel = ({ jobId, status }) => {
         target="_blank"
         rel="noreferrer"
       >
-        ↓ Download SKILL.md
+        ↓ Download skill.md
         <div className="download-sub">
           Agent-ready knowledge file that mirrors the speaker.
         </div>

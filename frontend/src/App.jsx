@@ -61,7 +61,7 @@ const App = () => {
         <button className="brand-btn" type="button" onClick={reset}>
           <span className="brand-title">createSkill</span>
           <span className="brand-tagline">
-            Turn any YouTube video into agent-ready knowledge
+            Turn any YouTube video into an AI-agent ready skill - (skill.md)
           </span>
         </button>
         {jobId && (
@@ -97,6 +97,18 @@ const App = () => {
           <DownloadPanel jobId={jobId} status={status} />
         </>
       )}
+      <footer className="founder-info">
+        <span>Built by Samiran</span>
+        <span aria-hidden="true"> · </span>
+        <a
+          className="founder-link"
+          href="https://www.linkedin.com/in/samiranraii"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          LinkedIn
+        </a>
+      </footer>
     </div>
   );
 };
