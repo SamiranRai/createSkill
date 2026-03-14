@@ -82,7 +82,7 @@ button {
 }
 
 .brand-tagline {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--muted);
   font-family: var(--font-mono);
 }
@@ -103,7 +103,7 @@ button {
   background: #161616;
   color: var(--muted);
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   transition: color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
@@ -132,7 +132,7 @@ button {
 
 .label {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 15px;
   color: var(--muted);
 }
 
@@ -149,7 +149,7 @@ button {
   background: #0f0f0f;
   color: var(--text);
   font-family: var(--font-mono);
-  font-size: 15px;
+  font-size: 17px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -197,7 +197,7 @@ button {
 .muted {
   color: var(--muted);
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .status-card {
@@ -264,7 +264,7 @@ button {
   background: #1a1a1a;
   border: 1px solid var(--border-hi);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text);
 }
 
@@ -326,7 +326,7 @@ button {
 
 .step-status {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 14px;
   color: var(--muted);
 }
 
@@ -390,7 +390,7 @@ button {
   margin-top: 6px;
   font-family: var(--font-mono);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .error-banner {
@@ -423,7 +423,7 @@ button {
 .meta-author {
   font-family: var(--font-mono);
   color: var(--muted);
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .video-title {
@@ -435,7 +435,7 @@ button {
 .inline-error {
   color: var(--error);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .actions-row {
@@ -450,7 +450,7 @@ button {
   text-align: center;
   color: var(--muted);
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .founder-link {

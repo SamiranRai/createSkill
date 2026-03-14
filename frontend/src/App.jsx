@@ -98,7 +98,7 @@ const App = () => {
         </>
       )}
       <footer className="founder-info">
-        <span>Built by Samiran</span>
+        <span>Built by Samiran 💛</span>
         <span aria-hidden="true"> · </span>
         <a
           className="founder-link"
