@@ -56,60 +56,66 @@ const App = () => {
   const status = jobData?.status || "pending";
 
   return (
-    <div className="container">
-      <header className="header">
-        <button className="brand-btn" type="button" onClick={reset}>
-          <span className="brand-title">createSkill</span>
-          <span className="brand-tagline">
-            Turn any YouTube video into an AI-agent ready skill - (skill.md)
-          </span>
-        </button>
-        {jobId && (
-          <button className="back-btn" type="button" onClick={reset}>
-            ← New Video
+    <>
+      <div className="server-status-banner" role="status" aria-live="polite">
+        Server is down. We&apos;re fixing it.
+      </div>
+
+      <div className="container">
+        <header className="header">
+          <button className="brand-btn" type="button" onClick={reset}>
+            <span className="brand-title">createSkill</span>
+            <span className="brand-tagline">
+              Turn any YouTube video into an AI-agent ready skill - (skill.md)
+            </span>
           </button>
+          {jobId && (
+            <button className="back-btn" type="button" onClick={reset}>
+              ← New Video
+            </button>
+          )}
+        </header>
+
+        <div className="divider" />
+
+        {error && (
+          <ErrorBanner message={error} onDismiss={() => setError(null)} />
         )}
-      </header>
 
-      <div className="divider" />
+        {!jobId && <UrlInput onSubmit={handleSubmit} loading={loading} />}
 
-      {error && (
-        <ErrorBanner message={error} onDismiss={() => setError(null)} />
-      )}
-
-      {!jobId && <UrlInput onSubmit={handleSubmit} loading={loading} />}
-
-      {jobId && (
-        <>
-          <JobStatus
-            status={status}
-            successfulLayer={jobData?.successfulLayer}
-            processingMs={jobData?.processingMs}
-            error={jobData?.error}
-          />
-          <ProgressSteps
-            status={status}
-            failureStage={jobData?.error?.failedAt}
-          />
-          <VideoMeta
-            videoMeta={{ ...jobData?.videoMeta, videoId: jobData?.videoId }}
-          />
-          <DownloadPanel jobId={jobId} status={status} />
-        </>
-      )}
-      <footer className="founder-info">
-        <span>Built by Samiran 💛</span>
-        <span aria-hidden="true"> · </span>
-        <a
-          className="founder-link"
-          href="https://www.linkedin.com/in/samiranraii"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          LinkedIn
-        </a>
-      </footer>
-    </div>
+        {jobId && (
+          <>
+            <JobStatus
+              status={status}
+              successfulLayer={jobData?.successfulLayer}
+              processingMs={jobData?.processingMs}
+              error={jobData?.error}
+            />
+            <ProgressSteps
+              status={status}
+              failureStage={jobData?.error?.failedAt}
+            />
+            <VideoMeta
+              videoMeta={{ ...jobData?.videoMeta, videoId: jobData?.videoId }}
+            />
+            <DownloadPanel jobId={jobId} status={status} />
+          </>
+        )}
+        <footer className="founder-info">
+          <span>Built by Samiran 💛</span>
+          <span aria-hidden="true"> · </span>
+          <a
+            className="founder-link"
+            href="https://www.linkedin.com/in/samiranraii"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            LinkedIn
+          </a>
+        </footer>
+      </div>
+    </>
   );
 };
 

@@ -42,11 +42,30 @@ button {
 .container {
   max-width: 740px;
   margin: 0 auto;
-  padding: 52px 28px 80px;
+  padding: 98px 28px 80px;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.server-status-banner {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  padding: 10px 16px;
+  border: 1px solid #ff8f8f;
+  border-radius: var(--radius-sm);
+  background: #7a1111;
+  color: #ffe7e7;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  text-align: center;
+  box-shadow: 0 6px 24px rgba(122, 17, 17, 0.35);
 }
 
 .header {
@@ -465,8 +484,13 @@ button {
 
 @media (max-width: 640px) {
   .container {
-    padding: 32px 16px 60px;
+    padding: 88px 16px 60px;
     gap: 16px;
+  }
+
+  .server-status-banner {
+    top: 10px;
+    width: calc(100% - 24px);
   }
 
   .brand-title {
