@@ -13,16 +13,22 @@ const TMP_DIR = path.join(__dirname, "../../../../tmp");
 const TIMEOUT_MS = 45_000;
 const IS_PROD = isProd;
 
+// ─── Proxy pool — round robin ─────────────────────────────────────────────────
+
 const PROXY_POOL = (env.RESIDENTIAL_PROXY_URL || "")
   .split(",")
   .map((p) => p.trim())
   .filter(Boolean);
 
-const getRandomProxy = () => {
+let _proxyIdx = 0;
+const getNextProxy = () => {
   if (!PROXY_POOL.length) return null;
-  return PROXY_POOL[Math.floor(Math.random() * PROXY_POOL.length)];
+  const proxy = PROXY_POOL[_proxyIdx % PROXY_POOL.length];
+  _proxyIdx++;
+  return proxy;
 };
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const ensureDir = (dir) => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -33,6 +39,8 @@ const cleanupFile = (filePath) => {
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   } catch {}
 };
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const decodeEntities = (text) =>
   text
@@ -70,6 +78,8 @@ const parseVTT = (vtt) => {
   return decodeEntities(deduped.join(" ").replace(/\s+/g, " ").trim());
 };
 
+// ─── Build strategies ─────────────────────────────────────────────────────────
+
 const buildStrategies = (videoId, cookiePath) => {
   const base = [
     "--write-subs",
@@ -78,10 +88,12 @@ const buildStrategies = (videoId, cookiePath) => {
     "--skip-download",
     "--sub-format vtt",
     "--no-warnings",
+    "--no-check-certificates",
+    "--socket-timeout 10",
   ];
 
   const cookieFlag = cookiePath ? `--cookies "${cookiePath}"` : "";
-  const proxy = getRandomProxy();
+  const proxy = getNextProxy();
   const proxyFlag = proxy ? `--proxy "${proxy}"` : "";
 
   const iosArgs = [
@@ -89,29 +101,48 @@ const buildStrategies = (videoId, cookiePath) => {
     `--user-agent "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X)"`,
   ];
 
+  const tvArgs = [`--extractor-args "youtube:player_client=tv_embedded"`];
+
+  const creatorArgs = [`--extractor-args "youtube:player_client=web_creator"`];
+
   const strategies = [
+    // ── With rotating proxy ──────────────────────────────────────────────────
     {
-      name: "ios+proxy",
-      outputPath: path.join(TMP_DIR, `${videoId}_p`),
+      name: "proxy+ios",
+      outputPath: path.join(TMP_DIR, `${videoId}_p1`),
       args: [...base, ...iosArgs, cookieFlag, proxyFlag],
     },
     {
-      name: "ios+noproxy",
-      outputPath: path.join(TMP_DIR, `${videoId}_n`),
+      name: "proxy+tv",
+      outputPath: path.join(TMP_DIR, `${videoId}_p2`),
+      args: [...base, ...tvArgs, cookieFlag, proxyFlag],
+    },
+    {
+      name: "proxy+creator",
+      outputPath: path.join(TMP_DIR, `${videoId}_p3`),
+      args: [...base, ...creatorArgs, cookieFlag, proxyFlag],
+    },
+    // ── No proxy fallbacks ───────────────────────────────────────────────────
+    {
+      name: "noproxy+ios",
+      outputPath: path.join(TMP_DIR, `${videoId}_n1`),
       args: [...base, ...iosArgs, cookieFlag],
     },
     {
-      name: "bare",
-      outputPath: path.join(TMP_DIR, `${videoId}_b`),
-      args: [...base, cookieFlag],
+      name: "noproxy+tv",
+      outputPath: path.join(TMP_DIR, `${videoId}_n2`),
+      args: [...base, ...tvArgs, cookieFlag],
     },
   ];
 
+  // Local dev — use browser cookies, no proxy
   if (!IS_PROD) {
     return strategies.map((s) => ({
       ...s,
       args: [
-        ...s.args.filter((a) => !a.startsWith("--cookies")),
+        ...s.args.filter(
+          (a) => !a.startsWith("--cookies") && !a.startsWith("--proxy"),
+        ),
         "--cookies-from-browser chrome",
       ],
     }));
@@ -119,6 +150,8 @@ const buildStrategies = (videoId, cookiePath) => {
 
   return strategies;
 };
+
+// ─── Run single strategy ──────────────────────────────────────────────────────
 
 const runStrategy = async (strategy, videoId) => {
   const vttFile = `${strategy.outputPath}.en.vtt`;
@@ -145,51 +178,68 @@ const runStrategy = async (strategy, videoId) => {
   }
 };
 
+// ─── Cache with TTL ───────────────────────────────────────────────────────────
+
 const cache = new Map();
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+const cacheSet = (k, v) => cache.set(k, { v, exp: Date.now() + CACHE_TTL });
+const cacheGet = (k) => {
+  const e = cache.get(k);
+  if (!e) return null;
+  if (Date.now() > e.exp) {
+    cache.delete(k);
+    return null;
+  }
+  return e.v;
+};
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 const getTranscript = async (videoId) => {
-  if (cache.has(videoId)) {
+  const cached = cacheGet(videoId);
+  if (cached) {
     console.log(`[Layer1] Cache hit — ${videoId}`);
-    return cache.get(videoId);
+    return cached;
   }
 
   console.log(`[Layer1] Fetching — ${videoId}`);
   ensureDir(TMP_DIR);
 
   const cookiePath = IS_PROD ? writeCookieFile() : null;
-  const [s1, s2, s3] = buildStrategies(videoId, cookiePath);
+  const strategies = buildStrategies(videoId, cookiePath);
 
-  // Phase 1: race s1 and s2 in parallel
-  let vttFile = await Promise.any(
-    [runStrategy(s1, videoId), runStrategy(s2, videoId)].map((p) =>
-      p.then((r) => r ?? Promise.reject()),
-    ),
-  ).catch(() => null);
+  let vttFile = null;
+  let winner = null;
 
-  // Phase 2: sequential fallback
-  if (!vttFile) {
-    console.log("[Layer1] Parallel strategies failed, trying fallback...");
-    vttFile = await runStrategy(s3, videoId);
+  for (const strategy of strategies) {
+    vttFile = await runStrategy(strategy, videoId);
+    if (vttFile) {
+      winner = strategy;
+      break;
+    }
+    await sleep(500);
   }
 
+  // ✅ READ FIRST before any cleanup
   if (!vttFile) {
-    // Cleanup all then throw
-    [s1, s2, s3].forEach((s) => cleanupFile(`${s.outputPath}.en.vtt`));
+    strategies.forEach((s) => cleanupFile(`${s.outputPath}.en.vtt`));
     throw new Error(
       "[Layer1] All strategies failed — check proxy health or refresh cookies.",
     );
   }
 
-  // ✅ READ FIRST, then cleanup losers
   const raw = fs.readFileSync(vttFile, "utf8");
-  [s1, s2, s3].forEach((s) => cleanupFile(`${s.outputPath}.en.vtt`));
+
+  // THEN cleanup all temp files
+  strategies.forEach((s) => cleanupFile(`${s.outputPath}.en.vtt`));
 
   const text = parseVTT(raw);
   if (!text) throw new Error("[Layer1] Transcript empty after parsing");
 
-  cache.set(videoId, text);
-  console.log(`[Layer1] ✓ Done — ${text.length} chars`);
+  cacheSet(videoId, text);
+  console.log(`[Layer1] ✓ Done via ${winner.name} — ${text.length} chars`);
   return text;
-};
+};;;
 
 module.exports = getTranscript;
