@@ -58,7 +58,7 @@ const App = () => {
   return (
     <>
       <div className="server-status-banner" role="status" aria-live="polite">
-        Server is down. We&apos;re fixing it.
+        Note: Heavy traffic may cause file generation to fail. Please retry.
       </div>
 
       <div className="container">
@@ -92,10 +92,7 @@ const App = () => {
               processingMs={jobData?.processingMs}
               error={jobData?.error}
             />
-            <ProgressSteps
-              status={status}
-              failureStage={jobData?.error?.failedAt}
-            />
+            <ProgressSteps failureStage={jobData?.error?.failedAt} />
             <VideoMeta
               videoMeta={{ ...jobData?.videoMeta, videoId: jobData?.videoId }}
             />

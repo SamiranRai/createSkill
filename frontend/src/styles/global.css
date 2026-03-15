@@ -56,16 +56,16 @@ button {
   transform: translateX(-50%);
   z-index: 1000;
   padding: 10px 16px;
-  border: 1px solid #ff8f8f;
+  border: 1px solid #4c6471;
   border-radius: var(--radius-sm);
-  background: #7a1111;
-  color: #ffe7e7;
+  background: #15242b;
+  color: #d8e8ef;
   font-family: var(--font-mono);
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.2px;
   text-align: center;
-  box-shadow: 0 6px 24px rgba(122, 17, 17, 0.35);
+  box-shadow: 0 6px 24px rgba(21, 36, 43, 0.3);
 }
 
 .header {
