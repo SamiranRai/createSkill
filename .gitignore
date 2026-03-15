@@ -6,3 +6,4 @@ dist
 build
 tmp
 .DS_Store
+src/services/notUsedFile
