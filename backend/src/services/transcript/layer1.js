@@ -4,6 +4,7 @@ const { exec } = require("child_process");
 const { promisify } = require("util");
 const fs = require("fs");
 const path = require("path");
+const axios = require("axios");
 const { env, isProd } = require("../../config/env");
 
 const execAsync = promisify(exec);
@@ -12,6 +13,8 @@ const YT_DLP_BIN = env.YT_DLP_PATH || "yt-dlp";
 const TMP_DIR = path.join(__dirname, "../../../../tmp");
 const TIMEOUT_MS = 45_000;
 const IS_PROD = isProd;
+const TRANSCRIPT_API_BASE_URL = "https://transcriptapi.com/api/v2";
+const TRANSCRIPT_API_RETRYABLE_STATUS = new Set([408, 429, 503]);
 
 // ─── Proxy pool — round robin ─────────────────────────────────────────────────
 
@@ -41,6 +44,90 @@ const cleanupFile = (filePath) => {
 };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const normalizeApiTranscript = (data) => {
+  if (!data) return "";
+
+  if (typeof data.transcript === "string") {
+    return data.transcript.replace(/\s+/g, " ").trim();
+  }
+
+  if (Array.isArray(data.transcript)) {
+    return data.transcript
+      .map((segment) => (typeof segment?.text === "string" ? segment.text : ""))
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  return "";
+};
+
+const fetchTranscriptFromApi = async (videoId) => {
+  const apiKey = env.YT_TRANSCRIPT_API_KEY;
+  if (!apiKey) return null;
+
+  const url = `${TRANSCRIPT_API_BASE_URL}/youtube/transcript`;
+  const maxAttempts = 3;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = await axios.get(url, {
+        params: {
+          video_url: videoId,
+          format: "json",
+          include_timestamp: false,
+          send_metadata: false,
+        },
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+        timeout: 12_000,
+        validateStatus: () => true,
+      });
+
+      if (response.status === 200) {
+        const text = normalizeApiTranscript(response.data);
+        return text || null;
+      }
+
+      if (!TRANSCRIPT_API_RETRYABLE_STATUS.has(response.status)) {
+        const detail = response?.data?.detail;
+        const message =
+          typeof detail === "string"
+            ? detail
+            : detail?.message || `HTTP ${response.status}`;
+        const nonRetryableError = new Error(
+          `[TranscriptAPI] Non-retryable error: ${message}`,
+        );
+        nonRetryableError.nonRetryable = true;
+        throw nonRetryableError;
+      }
+
+      if (attempt === maxAttempts) {
+        throw new Error(
+          `[TranscriptAPI] Retry limit reached (status ${response.status})`,
+        );
+      }
+
+      const retryAfter = Number(response.headers?.["retry-after"] || 0);
+      const backoffMs = retryAfter > 0 ? retryAfter * 1000 : attempt * 1000;
+      await sleep(backoffMs);
+    } catch (err) {
+      if (err?.nonRetryable) {
+        throw err;
+      }
+
+      if (attempt === maxAttempts) {
+        throw new Error(`[TranscriptAPI] Request failed: ${err.message}`);
+      }
+
+      await sleep(attempt * 1000);
+    }
+  }
+
+  return null;
+};
 
 const decodeEntities = (text) =>
   text
@@ -224,9 +311,21 @@ const getTranscript = async (videoId) => {
   // ✅ READ FIRST before any cleanup
   if (!vttFile) {
     strategies.forEach((s) => cleanupFile(`${s.outputPath}.en.vtt`));
-    throw new Error(
-      "[Layer1] All strategies failed — check proxy health or refresh cookies.",
+
+    console.log("[Layer1] Trying final fallback: TranscriptAPI");
+    const apiTranscript = await fetchTranscriptFromApi(videoId);
+
+    if (!apiTranscript) {
+      throw new Error(
+        "[Layer1] All strategies failed, including TranscriptAPI fallback.",
+      );
+    }
+
+    cacheSet(videoId, apiTranscript);
+    console.log(
+      `[Layer1] ✓ Done via transcriptapi fallback — ${apiTranscript.length} chars`,
     );
+    return apiTranscript;
   }
 
   const raw = fs.readFileSync(vttFile, "utf8");
@@ -240,6 +339,6 @@ const getTranscript = async (videoId) => {
   cacheSet(videoId, text);
   console.log(`[Layer1] ✓ Done via ${winner.name} — ${text.length} chars`);
   return text;
-};;;
+};
 
 module.exports = getTranscript;

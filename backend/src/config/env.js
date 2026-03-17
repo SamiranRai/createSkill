@@ -43,6 +43,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   MONGODB_URI: z.string().min(1, "MONGODB_URI is required"),
   GEMINI_API_KEY: z.string().min(1, "GEMINI_API_KEY is required"),
+  YT_TRANSCRIPT_API_KEY: z.string().min(1).optional(),
   YT_DLP_PATH: z.string().min(1).optional(),
   YT_COOKIES_B64: z.string().min(1).optional(),
   RESIDENTIAL_PROXY_URL: z.string().optional(),
