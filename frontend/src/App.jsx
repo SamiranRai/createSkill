@@ -57,9 +57,9 @@ const App = () => {
 
   return (
     <>
-      <div className="server-status-banner" role="status" aria-live="polite">
+      {/* <div className="server-status-banner" role="status" aria-live="polite">
         Note: Heavy traffic may cause file generation to fail. Please retry.
-      </div>
+      </div> */}
 
       <div className="container">
         <header className="header">

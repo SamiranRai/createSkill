@@ -42,14 +42,14 @@ button {
 .container {
   max-width: 740px;
   margin: 0 auto;
-  padding: 98px 28px 80px;
+  padding: 52px 28px 80px;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
-.server-status-banner {
+/* .server-status-banner {
   position: fixed;
   top: 16px;
   left: 50%;
@@ -66,7 +66,7 @@ button {
   letter-spacing: 0.2px;
   text-align: center;
   box-shadow: 0 6px 24px rgba(21, 36, 43, 0.3);
-}
+} */
 
 .header {
   display: flex;
@@ -484,14 +484,14 @@ button {
 
 @media (max-width: 640px) {
   .container {
-    padding: 88px 16px 60px;
+    padding: 52px 16px 60px;
     gap: 16px;
   }
 
-  .server-status-banner {
+  /* .server-status-banner {
     top: 10px;
     width: calc(100% - 24px);
-  }
+  } */
 
   .brand-title {
     font-size: 24px;
