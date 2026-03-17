@@ -92,7 +92,10 @@ const App = () => {
               processingMs={jobData?.processingMs}
               error={jobData?.error}
             />
-            <ProgressSteps failureStage={jobData?.error?.failedAt} />
+            <ProgressSteps
+              status={status}
+              failureStage={jobData?.error?.failedAt}
+            />
             <VideoMeta
               videoMeta={{ ...jobData?.videoMeta, videoId: jobData?.videoId }}
             />
